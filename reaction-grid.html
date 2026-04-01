@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reaction Grid – Chemistry Puzzle</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#e6edf3;min-height:100vh}
+
+/* ── TOP BAR ───────────────────────────── */
+.top-bar{background:#161b22;border-bottom:2px solid #30363d;padding:10px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.top-logo{font-size:1.1rem;font-weight:700;color:#58a6ff;letter-spacing:2px}
+.top-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.puzzle-title{font-size:0.9rem;color:#c9d1d9}
+.diff-badge{padding:2px 9px;border-radius:10px;font-size:0.7rem;font-weight:700;border:1px solid}
+.diff-Easy{border-color:#3fb950;color:#3fb950;background:#0a2218}
+.diff-Medium{border-color:#d29922;color:#d29922;background:#1f1a00}
+.diff-Hard{border-color:#f85149;color:#f85149;background:#1e0a0a}
+.top-date{font-size:0.78rem;color:#8b949e}
+.btn-arch{padding:5px 13px;background:#1c2128;border:1px solid #444c56;color:#c9d1d9;border-radius:5px;cursor:pointer;font-size:0.78rem;font-weight:600}
+.btn-arch:hover{background:#2d333b}
+.btn-arch.active{border-color:#58a6ff;color:#58a6ff}
+
+/* ── ARCHIVE PANEL ─────────────────────── */
+.archive-panel{display:none;background:#161b22;border-bottom:2px solid #30363d;padding:14px 18px;max-height:240px;overflow-y:auto}
+.archive-panel.show{display:block}
+.archive-panel h4{font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;color:#58a6ff;margin-bottom:10px}
+.archive-grid{display:flex;flex-wrap:wrap;gap:7px}
+.arch-day{padding:5px 12px;border-radius:5px;font-size:0.75rem;cursor:pointer;border:1px solid #30363d;background:#1c2128;color:#8b949e;transition:all .15s;white-space:nowrap}
+.arch-day:hover{border-color:#58a6ff;color:#c9d1d9}
+.arch-day.today{border-color:#58a6ff;color:#58a6ff;font-weight:700}
+.arch-day.selected{background:#21262d;color:#e6edf3;border-color:#58a6ff}
+.arch-day.future{color:#444c56;cursor:default;pointer-events:none}
+
+/* ── MAIN LAYOUT ───────────────────────── */
+.game-wrap{display:flex;gap:24px;padding:18px;flex-wrap:wrap;align-items:flex-start}
+
+/* ── GRID ──────────────────────────────── */
+.grid-panel{flex:0 0 auto}
+.grid{display:grid;grid-template-columns:repeat(8,78px);grid-template-rows:repeat(5,78px);gap:3px;background:#30363d;border:3px solid #30363d;border-radius:8px;overflow:hidden}
+.cell{position:relative;width:78px;height:78px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.cell.black{background:#0d1117}
+.cell.arrow{background:#161b22;font-size:1.6rem;color:#58a6ff;font-weight:bold}
+.cell.active{background:#1c2128}
+.cell.shared{background:#1e1a12;outline:3px solid #f0883e;outline-offset:-3px}
+.cell.correct{background:#0a2218;outline:3px solid #3fb950;outline-offset:-3px}
+.cell.wrong{background:#1e0a0a;outline:3px solid #f85149;outline-offset:-3px}
+.cell.shared.correct{outline-color:#3fb950}
+.cell.shared.wrong{outline-color:#f85149}
+.cell.hi{outline:3px solid #58a6ff;outline-offset:-3px}
+.cell.shared.hi{outline:3px solid #f0883e;outline-offset:-3px}
+.cell-num{position:absolute;top:3px;left:4px;font-size:.55rem;font-weight:700;color:#58a6ff;line-height:1}
+.cell-formula{font-size:.58rem;color:#8b949e;text-align:center;line-height:1.2;padding:0 2px;max-width:74px;word-break:break-word}
+.cell.shared .cell-formula{color:#f0883e}
+.cell input{width:40px;height:36px;background:#0d1117;border:1px solid #444c56;color:#e6edf3;font-size:1.2rem;font-weight:700;text-align:center;border-radius:4px;outline:none;-moz-appearance:textfield}
+.cell input::-webkit-outer-spin-button,.cell input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.cell input:focus{border-color:#58a6ff;box-shadow:0 0 0 2px rgba(88,166,255,.2)}
+.cell input.locked{color:#8b949e;cursor:default;border-style:dashed}
+
+/* ── BADGES + CONTROLS ─────────────────── */
+.rxn-status{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}
+.rbadge{padding:4px 11px;border-radius:16px;font-size:.72rem;font-weight:600;border:1px solid #444c56;background:#1c2128;color:#8b949e;transition:all .2s}
+.rbadge.balanced{border-color:#3fb950;color:#3fb950;background:#0a2218}
+.rbadge.unbalanced{border-color:#f85149;color:#f85149;background:#1e0a0a}
+.controls{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap}
+.btn{padding:8px 17px;border:none;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .15s}
+.btn-check{background:#238636;color:#fff}.btn-check:hover{background:#2ea043}
+.btn-hint{background:#1c2128;color:#f0883e;border:1px solid #f0883e}.btn-hint:hover{background:#1e1a12}
+.btn-clear{background:#1c2128;color:#c9d1d9;border:1px solid #444c56}.btn-clear:hover{background:#2d333b}
+.btn-reveal{background:#1c2128;color:#f85149;border:1px solid #f85149}.btn-reveal:hover{background:#1e0a0a}
+.status-bar{margin-top:12px;padding:9px 13px;border-radius:6px;font-size:.82rem;display:none;line-height:1.4}
+.status-bar.show{display:block}
+.status-bar.success{background:#0a2218;border:1px solid #3fb950;color:#3fb950}
+.status-bar.error{background:#1e0a0a;border:1px solid #f85149;color:#f85149}
+.status-bar.info{background:#111d2e;border:1px solid #58a6ff;color:#79c0ff}
+
+/* ── CLUES PANEL ───────────────────────── */
+.clues-panel{flex:1;min-width:280px;max-width:440px}
+.howto{background:#161b22;border:1px solid #30363d;border-radius:7px;padding:12px 14px;margin-bottom:16px;font-size:.78rem;line-height:1.65;color:#8b949e}
+.howto h4{color:#e6edf3;font-size:.85rem;margin-bottom:7px}
+.howto ol{padding-left:16px}
+.howto li{margin-bottom:3px}
+.clues-sec{margin-bottom:16px}
+.clues-sec h3{color:#58a6ff;font-size:.72rem;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #30363d}
+.clue-item{margin-bottom:8px;padding:10px 12px;background:#161b22;border-radius:6px;border-left:3px solid #30363d;cursor:pointer;transition:all .15s}
+.clue-item:hover,.clue-item.active{border-left-color:#58a6ff;background:#1c2128}
+.clue-lbl{font-size:.7rem;font-weight:700;color:#58a6ff;margin-bottom:4px;letter-spacing:.5px}
+.clue-txt{font-size:.82rem;color:#c9d1d9;line-height:1.4}
+.ref-table{width:100%;border-collapse:collapse;font-size:.76rem}
+.ref-table th{text-align:left;padding:5px 7px;color:#8b949e;border-bottom:1px solid #30363d;font-weight:600;font-size:.68rem;text-transform:uppercase;letter-spacing:.5px}
+.ref-table td{padding:6px 7px;border-bottom:1px solid #21262d;color:#c9d1d9}
+.ref-table tr:hover td{background:#1c2128}
+.pill{font-family:monospace;background:#21262d;padding:1px 6px;border-radius:3px;color:#e6edf3;font-size:.78rem}
+.shr-pill{background:#1e1a12;color:#f0883e;font-size:.65rem;padding:1px 5px;border-radius:3px;border:1px solid #f0883e;font-weight:600}
+
+/* ── WIN ───────────────────────────────── */
+@keyframes pop{0%,100%{transform:scale(1)}50%{transform:scale(1.02)}}
+.grid.won{animation:pop .4s ease 3;border-color:#3fb950}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="top-logo">⚗️ REACTION GRID</div>
+  <div class="top-meta">
+    <span class="top-date" id="topDate"></span>
+    <span class="puzzle-title" id="topTitle"></span>
+    <span class="diff-badge" id="topDiff"></span>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="btn-arch" id="btnArch" onclick="toggleArchive()">📅 Archive</button>
+  </div>
+</div>
+
+<div class="archive-panel" id="archPanel">
+  <h4>Puzzle Archive — click any date to load that day's puzzle</h4>
+  <div class="archive-grid" id="archGrid"></div>
+</div>
+
+<div class="game-wrap">
+  <div class="grid-panel">
+    <div class="grid" id="grid"></div>
+    <div class="rxn-status" id="rStatus"></div>
+    <div class="controls">
+      <button class="btn btn-check" onclick="checkSolution()">✓ Check</button>
+      <button class="btn btn-hint"  onclick="giveHint()">💡 Hint</button>
+      <button class="btn btn-clear" onclick="clearAll()">↺ Clear</button>
+      <button class="btn btn-reveal" onclick="revealAll()">👁 Reveal</button>
+    </div>
+    <div class="status-bar" id="statusBar"></div>
+  </div>
+
+  <div class="clues-panel">
+    <div class="howto">
+      <h4>How to Play</h4>
+      <ol>
+        <li>Read each clue — compounds are given in <em>words</em>, not formulas.</li>
+        <li>Find each compound's formula in the reference table below.</li>
+        <li>Enter coefficients (1–9) so both sides of each reaction balance — equal atoms on each side.</li>
+        <li><span style="color:#f0883e;font-weight:600">Orange cells are shared</span> between two reactions. One number serves both.</li>
+        <li>Press <strong>Check</strong> when every reaction is balanced.</li>
+      </ol>
+    </div>
+    <div class="clues-sec"><h3>Across</h3><div id="acrossClues"></div></div>
+    <div class="clues-sec"><h3>Down</h3><div id="downClues"></div></div>
+    <div class="clues-sec">
+      <h3>Compound Reference</h3>
+      <table class="ref-table"><thead><tr><th>Name</th><th>Formula</th><th></th></tr></thead>
+      <tbody id="refBody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+//  PUZZLE BANK  — 15 verified puzzles, auto-rotated by calendar date
+//  Grid IDs: R1 R2 → S1 P1  (Across 1)
+//            S1 R3 ↓ P2 S2  (Down 1)
+//            S2 R4 → P3 P4  (Across 2)
+//  S1 and S2 are the shared (orange) cells.
+// ═══════════════════════════════════════════════════════════════════════
+
+const PUZZLE_BANK = [
+
+// ─────────────────── PUZZLE 1  Ca–Cl / Na₂CO₃ ─────────────────────────
+{title:'Calcium–Chloride Chain', difficulty:'Medium',
+ compounds:{
+  R1:{f:'HCl',      n:'Hydrochloric acid',   a:{H:1,Cl:1}},
+  R2:{f:'Ca(OH)₂',  n:'Calcium hydroxide',   a:{Ca:1,O:2,H:2}},
+  S1:{f:'CaCl₂',    n:'Calcium chloride',    a:{Ca:1,Cl:2}, shared:true},
+  P1:{f:'H₂O',      n:'Water',               a:{H:2,O:1}},
+  R3:{f:'AgNO₃',    n:'Silver nitrate',      a:{Ag:1,N:1,O:3}},
+  P2:{f:'AgCl',     n:'Silver chloride',     a:{Ag:1,Cl:1}},
+  S2:{f:'Ca(NO₃)₂', n:'Calcium nitrate',     a:{Ca:1,N:2,O:6}, shared:true},
+  R4:{f:'Na₂CO₃',   n:'Sodium carbonate',    a:{Na:2,C:1,O:3}},
+  P3:{f:'CaCO₃',    n:'Calcium carbonate',   a:{Ca:1,C:1,O:3}},
+  P4:{f:'NaNO₃',    n:'Sodium nitrate',      a:{Na:1,N:1,O:3}},
+ },
+ clues:{
+  A1:'Hydrochloric acid + Calcium hydroxide → Calcium chloride + Water',
+  D1:'Calcium chloride + Silver nitrate → Silver chloride + Calcium nitrate',
+  A2:'Calcium nitrate + Sodium carbonate → Calcium carbonate + Sodium nitrate',
+ },
+ solution:{R1:2,R2:1,S1:1,P1:2,R3:2,P2:2,S2:1,R4:1,P3:1,P4:2},
+ locked:{R4:1,P3:1}},
+
+// ─────────────────── PUZZLE 2  Mg–Cl / Na₂CO₃ ─────────────────────────
+{title:'Magnesium–Chloride Chain', difficulty:'Medium',
+ compounds:{
+  R1:{f:'HCl',      n:'Hydrochloric acid',    a:{H:1,Cl:1}},
+  R2:{f:'Mg(OH)₂',  n:'Magnesium hydroxide',  a:{Mg:1,O:2,H:2}},
+  S1:{f:'MgCl₂',    n:'Magnesium chloride',   a:{Mg:1,Cl:2}, shared:true},
+  P1:{f:'H₂O',      n:'Water',                a:{H:2,O:1}},
+  R3:{f:'AgNO₃',    n:'Silver nitrate',       a:{Ag:1,N:1,O:3}},
+  P2:{f:'AgCl',     n:'Silver chloride',      a:{Ag:1,Cl:1}},
+  S2:{f:'Mg(NO₃)₂', n:'Magnesium nitrate',    a:{Mg:1,N:2,O:6}, shared:true},
+  R4:{f:'Na₂CO₃',   n:'Sodium carbonate',     a:{Na:2,C:1,O:3}},
+  P3:{f:'MgCO₃',    n:'Magnesium carbonate',  a:{Mg:1,C:1,O:3}},
+  P4:{f:'NaNO₃',    n:'Sodium nitrate',       a:{Na:1,N:1,O:3}},
+ },
+ clues:{
+  A1:'Hydrochloric acid + Magnesium hydroxide → Magnesium chloride + Water',
+  D1:'Magnesium chloride + Silver nitrate → Silver chloride + Magnesium nitrate',
+  A2:'Magnesium nitrate + Sodium carbonate → Magnesium carbonate + Sodium nitrate',
+ },
+ solution:{R1:2,R2:1,S1:1,P1:2,R3:2,P2:2,S2:1,R4:1,P3:1,P4:2},
+ locked:{R4:1,P3:1}},
+
+// ─────────────────── PUZZLE 3  Zn–Cl / Na₂CO₃ ─────────────────────────
+{title:'Zinc–Chloride Chain', difficulty:'Medium',
+ compounds:{
+  R1:{f:'HCl',      n:'Hydrochloric acid',  a:{H:1,Cl:1}},
+  R2:{f:'Zn(OH)₂',  n:'Zinc hydroxide',     a:{Zn:1,O:2,H:2}},
+  S1:{f:'ZnCl₂',    n:'Zinc chloride',      a:{Zn:1,Cl:2}, shared:true},
+  P1:{f:'H₂O',      n:'Water',              a:{H:2,O:1}},
+  R3:{f:'AgNO₃',    n:'Silver nitrate',     a:{Ag:1,N:1,O:3}},
+  P2:{f:'AgCl',     n:'Silver chloride',    a:{Ag:1,Cl:1}},
+  S2:{f:'Zn(NO₃)₂', n:'Zinc nitrate',       a:{Zn:1,N:2,O:6}, shared:true},
+  R4:{f:'Na₂CO₃',   n:'Sodium carbonate',   a:{Na:2,C:1,O:3}},
+  P3:{f:'ZnCO₃',    n:'Zinc carbonate',     a:{Zn:1,C:1,O:3}},
+  P4:{f:'NaNO₃',    n:'Sodium nitrate',     a:{Na:1,N:1,O:3}},
+ },
+ clues:{
+  A1:'Hydrochloric acid + Zinc hydroxide → Zinc chloride + Water',
+  D1:'Zinc chloride + Silver nitrate → Silver chloride + Zinc nitrate',
+  A2:'Zinc nitrate + Sodium carbonate → Zinc carbonate + Sodium nitrate',
+ },
+ solution:{R1:2,R2:1,S1:1,P1:2,R3:2,P2:2,S2:1,R4:1,P3:1,P4:2},
+ locked:{R2:1,P2:2}},
+
+// ─────────────────── PUZZLE 4  Ca–Br / Na₂CO₃ ─────────────────────────
+{title:'Calcium–Bromide Chain', difficulty:'Medium',
+ compounds:{
+  R1:{f:'HBr',      n:'Hydrobromic acid',   a:{H:1,Br:1}},
+  R2:{f:'Ca(OH)₂',  n:'Calcium hydroxide',  a:{Ca:1,O:2,H:2}},
+  S1:{f:'CaBr₂',    n:'Calcium bromide',    a:{Ca:1,Br:2}, shared:true},
+  P1:{f:'H₂O',      n:'Water',              a:{H:2,O:1}},
+  R3:{f:'AgNO₃',    n:'Silver nitrate',     a:{Ag:1,N:1,O:3}},
+  P2:{f:'AgBr',     n:'Silver bromide',     a:{Ag:1,Br:1}},
+  S2:{f:'Ca(NO₃)₂', n:'Calcium nitrate',    a:{Ca:1,N:2,O:6}, shared:true},
+  R4:{f:'Na₂CO₃',   n:'Sodium carbonate',   a:{Na:2,C:1,O:3}},
+  P3:{f:'CaCO₃',    n:'Calcium carbonate',  a:{Ca:1,C:1,O:3}},
+  P4:{f:'NaNO₃',    n:'Sodium nitrate',     a:{Na:1,N:1,O:3}},
+ },
+ clues:{
+  A1:'Hydrobromic acid + Calcium hydroxide → Calcium bromide + Water',
+  D1:'Calcium bromide + Silver nitrate → Silver bromide + Calcium nitrate',
+  A2:'Calcium nitrate + Sodium carbonate → Calcium carbonate + Sodium nitrate',
+ },
+ solution:{R1:2,R2:1,S1:1,P1:2,R3:2,P2:2,S2:1,R4:1,P3:1,P4:2},
+ locked:{R4:1,P3:1}},
+
+// ─────────────────── PUZZLE 5  Mg–Br / K₂CO₃ ──────────────────────────
+{title:'Magnesium–Bromide Chain', difficulty:'Medium',
+ compounds:{
+  R1:{f:'HBr',      n:'Hydrobromic acid',    a:{H:1,Br:1}},
+  R2:{f:'Mg(OH)₂',  n:'Magnesium hydroxide', a:{Mg:1,O:2,H:2}},
+  S1:{f:'MgBr₂',    n:'Magnesium bromide',   a:{Mg:1,Br:2}, shared:true},
+  P1:{f:'H₂O',      n:'Water',               a:{H:2,O:1}},
+  R3:{f:'AgNO₃',    n:'Silver nitrate',      a:{Ag:1,N:1,O:3}},
+  P2:{f:'AgBr',     n:'Silver bromide',      a:{Ag:1,Br:1}},
+  S2:{f:'Mg(NO₃)₂', n:'Magnesium nitrate',   a:{Mg:1,N:2,O:6}, shared:true},
+  R4:{f:'K₂CO₃',    n:'Potassium carbonate', a:{K:2,C:1,O:3}},
+  P3:{f:'MgCO₃',    n:'Magnesium carbonate', a:{Mg:1,C:1,O:3}},
+  P4:{f:'KNO₃',     n:'Potassium nitrate',   a:{K:1,N:1,O:3}},
+ },
+ clues:{
+  A1:'Hydrobromic acid + Magnesium hydroxide → Magnesium bromide + Water',
+  D1:'Magnesium bromide + Silver nitrate → Silver bromide + Magnesium nitrate',
+  A2:'Magnesium nitrate + Potassium carbonate → Magnesium carbonate + Potassium nitrate',
+ },
+ solution:{R1:2,R2:1,S1:1,P1:2,R3:2,P2:2,S2:1,R4:1,P3:1,P4:2},
+ locked:{R4:1,P3:1}},
+
+// ─────────────────── PUZZLE 6  Zn–Br / K₂CO₃ ──────────────────────────
+{title:'Zinc–Bromide Chain', difficulty:'Medium',
+ compounds:{
+  R1:{f:'HBr',      n:'Hydrobromic acid',    a:{H:1,Br:1}},
+  R2:{f:'Zn(OH)₂',  n:'Zinc hydroxide',      a:{Zn:1,O:2,H:2}},
+  S1:{f:'ZnBr₂',    n:'Zinc bromide',        a:{Zn:1,Br:2}, shared:true},
+  P1:{f:'H₂O',      n:'Water',               a:{H:2,O:1}},
+  R3:{f:'AgNO₃',    n:'Silver nitrate',      a:{Ag:1,N:1,O:3}},
+  P2:{f:'AgBr',     n:'Silver bromide',      a:{Ag:1,Br:1}},
+  S2:{f:'Zn(NO₃)₂', n:'Zinc nitrate',        a:{Zn:1,N:2,O:6}, shared:true},
+  R4:{f:'K₂CO₃',    n:'Potassium carbonate', a:{K:2,C:1,O:3}},
+  P3:{f:'ZnCO₃',    n:'Zinc carbonate',      a:{Zn:1,C:1,O:3}},
+  P4:{f:'KNO₃',     n:'Potassium nitrate',   a:{K:1,N:1,O:3}},
+ },
+ clues:{
+  A1:'Hydrobromic acid + Zinc hydroxide → Zinc bromide + Water',
+  D1:'Zinc bromide + Silver nitrate → Silver bromide + Zinc nitrate',
+  A2:'Zinc nitrate + Potassium carbonate → Zinc carbonate + Potassium nitrate',
+ },
+ solution:{R1:2,R2:1,S1:1,P1:2,R3:2,P2:2,S2:1,R4:1,P3:1,P4:2},
+ locked:{R2:1,P2:2}},
+
+// ─────────────────── PUZZLE 7  Ca–I / K₂CO₃ ───────────────────────────
+{title:'Calcium–Iodide Chain', difficulty:'Medium',
+ compounds:{
+  R1:{f:'HI',       n:'Hydroiodic acid',     a:{H:1,I:1}},
+  R2:{f:'Ca(OH)₂',  n:'Calcium hydroxide',   a:{Ca:1,O:2,H:2}},
+  S1:{f:'CaI₂',     n:'Calcium iodide',      a:{Ca:1,I:2}, shared:true},
+  P1:{f:'H₂O',      n:'Water',               a:{H:2,O:1}},
+  R3:{f:'AgNO₃',    n:'Silver nitrate',      a:{Ag:1,N:1,O:3}},
+  P2:{f:'AgI',      n:'Silver iodide',       a:{Ag:1,I:1}},
+  S2:{f:'Ca(NO₃)₂', n:'Calcium nitrate',     a:{Ca:1,N:2,O:6}, shared:true},
+  R4:{f:'K₂CO₃',    n:'Potassium carbonate', a:{K:2,C:1,O:3}},
+  P3:{f:'CaCO₃',    n:'Calcium carbonate',   a:{Ca:1,C:1,O:3}},
+  P4:{f:'KNO₃',     n:'Potassium nitrate',   a:{K:1,N:1,O:3}},
+ },
+ clues:{
+  A1:'Hydroiodic acid + Calcium hydroxide → Calcium iodide + Water',
+  D1:'Calcium iodide + Silver nitrate → Silver iodide + Calcium nitrate',
+  A2:'Calcium nitrate + Potassium carbonate → Calcium carbonate + Potassium nitrate',
+ },
+ solution:{R1:2,R2:1,S1:1,P1:2,R3:2,P2:2,S2:1,R4:1,P3:1,P4:2},
+ locked:{R4:1,P3:1}},
+
+// ─────────────────── PUZZLE 8  Na–SO₄–Pb ──────────────────────────────
+{title:'Sodium Sulfate–Lead Chain', difficulty:'Hard',
+ compounds:{
+  R1:{f:'H₂SO₄',    n:'Sulfuric acid',       a:{H:2,S:1,O:4}},
+  R2:{f:'NaOH',     n:'Sodium hydroxide',    a:{Na:1,O:1,H:1}},
+  S1:{f:'Na₂SO₄',   n:'Sodium sulfate',      a:{Na:2,S:1,O:4}, shared:true},
+  P1:{f:'H₂O',      n:'Water',               a:{H:2,O:1}},
+  R3:{f:'BaCl₂',    n:'Barium chloride',     a:{Ba:1,Cl:2}},
+  P2:{f:'BaSO₄',    n:'Barium sulfate',      a:{Ba:1,S:1,O:4}},
+  S2:{f:'NaCl',     n:'Sodium chloride',     a:{Na:1,Cl:1}, shared:true},
+  R4:{f:'Pb(NO₃)₂', n:'Lead(II) nitrate',    a:{Pb:1,N:2,O:6}},
+  P3:{f:'PbCl₂',    n:'Lead(II) chloride',   a:{Pb:1,Cl:2}},
+  P4:{f:'NaNO₃',    n:'Sodium nitrate',      a:{Na:1,N:1,O:3}},
+ },
+ clues:{
+  A1:'Sulfuric acid + Sodium hydroxide → Sodium sulfate + Water',
+  D1:'Sodium sulfate + Barium chloride → Barium sulfate + Sodium chloride',
+  A2:'Sodium chloride + Lead(II) nitrate → Lead(II) chloride + Sodium nitrate',
+ },
+ solution:{R1:1,R2:2,S1:1,P1:2,R3:1,P2:1,S2:2,R4:1,P3:1,P4:2},
+ locked:{P2:1,P3:1}},
+
+// ─────────────────── PUZZLE 9  K–SO₄–Pb ───────────────────────────────
+{title:'Potassium Sulfate–Lead Chain', difficulty:'Hard',
+ compounds:{
+  R1:{f:'H₂SO₄',    n:'Sulfuric acid',        a:{H:2,S:1,O:4}},
+  R2:{f:'KOH',      n:'Potassium hydroxide',  a:{K:1,O:1,H:1}},
+  S1:{f:'K₂SO₄',    n:'Potassium sulfate',    a:{K:2,S:1,O:4}, shared:true},
+  P1:{f:'H₂O',      n:'Water',                a:{H:2,O:1}},
+  R3:{f:'BaCl₂',    n:'Barium chloride',      a:{Ba:1,Cl:2}},
+  P2:{f:'BaSO₄',    n:'Barium sulfate',       a:{Ba:1,S:1,O:4}},
+  S2:{f:'KCl',      n:'Potassium chloride',   a:{K:1,Cl:1}, shared:true},
+  R4:{f:'Pb(NO₃)₂', n:'Lead(II) nitrate',     a:{Pb:1,N:2,O:6}},
+  P3:{f:'PbCl₂',    n:'Lead(II) chloride',    a:{Pb:1,Cl:2}},
+  P4:{f:'KNO₃',     n:'Potassium nitrate',    a:{K:1,N:1,O:3}},
+ },
+ clues:{
+  A1:'Sulfuric acid + Potassium hydroxide → Potassium sulfate + Water',
+  D1:'Potassium sulfate + Barium chloride → Barium sulfate + Potassium chloride',
+  A2:'Potassium chloride + Lead(II) nitrate → Lead(II) chloride + Potassium nitrate',
+ },
+ solution:{R1:1,R2:2,S1:1,P1:2,R3:1,P2:1,S2:2,R4:1,P3:1,P4:2},
+ locked:{P2:1,P3:1}},
+
+// ─────────────────── PUZZLE 10  Ba–Cl–SO₄–Pb ──────────────────────────
+{title:'Barium–Chloride Chain', difficulty:'Hard',
+ compounds:{
+  R1:{f:'HCl',      n:'Hydrochloric acid',   a:{H:1,Cl:1}},
+  R2:{f:'Ba(OH)₂',  n:'Barium hydroxide',    a:{Ba:1,O:2,H:2}},
+  S1:{f:'BaCl₂',    n:'Barium chloride',     a:{Ba:1,Cl:2}, shared:true},
+  P1:{f:'H₂O',      n:'Water',               a:{H:2,O:1}},
+  R3:{f:'Na₂SO₄',   n:'Sodium sulfate',      a:{Na:2,S:1,O:4}},
+  P2:{f:'BaSO₄',    n:'Barium sulfate',      a:{Ba:1,S:1,O:4}},
+  S2:{f:'NaCl',     n:'Sodium chloride',     a:{Na:1,Cl:1}, shared:true},
+  R4:{f:'Pb(NO₃)₂', n:'Lead(II) nitrate',    a:{Pb:1,N:2,O:6}},
+  P3:{f:'PbCl₂',    n:'Lead(II) chloride',   a:{Pb:1,Cl:2}},
+  P4:{f:'NaNO₃',    n:'Sodium nitrate',      a:{Na:1,N:1,O:3}},
+ },
+ clues:{
+  A1:'Hydrochloric acid + Barium hydroxide → Barium chloride + Water',
+  D1:'Barium chloride + Sodium sulfate → Barium sulfate + Sodium chloride',
+  A2:'Sodium chloride + Lead(II) nitrate → Lead(II) chloride + Sodium nitrate',
+ },
+ solution:{R1:2,R2:1,S1:1,P1:2,R3:1,P2:1,S2:2,R4:1,P3:1,P4:2},
+ locked:{P2:1,P3:1}},
+
+// ─────────────────── PUZZLE 11  Zn metal ───────────────────────────────
+{title:'Zinc Metal Displacement Chain', difficulty:'Medium',
+ compounds:{
+  R1:{f:'Zn',       n:'Zinc',               a:{Zn:1}},
+  R2:{f:'HCl',      n:'Hydrochloric acid',  a:{H:1,Cl:1}},
+  S1:{f:'ZnCl₂',    n:'Zinc chloride',      a:{Zn:1,Cl:2}, shared:true},
+  P1:{f:'H₂',       n:'Hydrogen gas',       a:{H:2}},
+  R3:{f:'AgNO₃',    n:'Silver nitrate',     a:{Ag:1,N:1,O:3}},
+  P2:{f:'AgCl',     n:'Silver chloride',    a:{Ag:1,Cl:1}},
+  S2:{f:'Zn(NO₃)₂', n:'Zinc nitrate',       a:{Zn:1,N:2,O:6}, shared:true},
+  R4:{f:'Na₂CO₃',   n:'Sodium carbonate',   a:{Na:2,C:1,O:3}},
+  P3:{f:'ZnCO₃',    n:'Zinc carbonate',     a:{Zn:1,C:1,O:3}},
+  P4:{f:'NaNO₃',    n:'Sodium nitrate',     a:{Na:1,N:1,O:3}},
+ },
+ clues:{
+  A1:'Zinc + Hydrochloric acid → Zinc chloride + Hydrogen gas',
+  D1:'Zinc chloride + Silver nitrate → Silver chloride + Zinc nitrate',
+  A2:'Zinc nitrate + Sodium carbonate → Zinc carbonate + Sodium nitrate',
+ },
+ solution:{R1:1,R2:2,S1:1,P1:1,R3:2,P2:2,S2:1,R4:1,P3:1,P4:2},
+ locked:{R4:1,P3:1}},
+
+// ─────────────────── PUZZLE 12  Fe metal ───────────────────────────────
+{title:'Iron Metal Displacement Chain', difficulty:'Medium',
+ compounds:{
+  R1:{f:'Fe',       n:'Iron',               a:{Fe:1}},
+  R2:{f:'HCl',      n:'Hydrochloric acid',  a:{H:1,Cl:1}},
+  S1:{f:'FeCl₂',    n:'Iron(II) chloride',  a:{Fe:1,Cl:2}, shared:true},
+  P1:{f:'H₂',       n:'Hydrogen gas',       a:{H:2}},
+  R3:{f:'AgNO₃',    n:'Silver nitrate',     a:{Ag:1,N:1,O:3}},
+  P2:{f:'AgCl',     n:'Silver chloride',    a:{Ag:1,Cl:1}},
+  S2:{f:'Fe(NO₃)₂', n:'Iron(II) nitrate',   a:{Fe:1,N:2,O:6}, shared:true},
+  R4:{f:'Na₂CO₃',   n:'Sodium carbonate',   a:{Na:2,C:1,O:3}},
+  P3:{f:'FeCO₃',    n:'Iron(II) carbonate', a:{Fe:1,C:1,O:3}},
+  P4:{f:'NaNO₃',    n:'Sodium nitrate',     a:{Na:1,N:1,O:3}},
+ },
+ clues:{
+  A1:'Iron + Hydrochloric acid → Iron(II) chloride + Hydrogen gas',
+  D1:'Iron(II) chloride + Silver nitrate → Silver chloride + Iron(II) nitrate',
+  A2:'Iron(II) nitrate + Sodium carbonate → Iron(II) carbonate + Sodium nitrate',
+ },
+ solution:{R1:1,R2:2,S1:1,P1:1,R3:2,P2:2,S2:1,R4:1,P3:1,P4:2},
+ locked:{R4:1,P3:1}},
+
+// ─────────────────── PUZZLE 13  Mg metal ───────────────────────────────
+{title:'Magnesium Metal Displacement Chain', difficulty:'Medium',
+ compounds:{
+  R1:{f:'Mg',       n:'Magnesium',           a:{Mg:1}},
+  R2:{f:'HCl',      n:'Hydrochloric acid',   a:{H:1,Cl:1}},
+  S1:{f:'MgCl₂',    n:'Magnesium chloride',  a:{Mg:1,Cl:2}, shared:true},
+  P1:{f:'H₂',       n:'Hydrogen gas',        a:{H:2}},
+  R3:{f:'AgNO₃',    n:'Silver nitrate',      a:{Ag:1,N:1,O:3}},
+  P2:{f:'AgCl',     n:'Silver chloride',     a:{Ag:1,Cl:1}},
+  S2:{f:'Mg(NO₃)₂', n:'Magnesium nitrate',   a:{Mg:1,N:2,O:6}, shared:true},
+  R4:{f:'K₂CO₃',    n:'Potassium carbonate', a:{K:2,C:1,O:3}},
+  P3:{f:'MgCO₃',    n:'Magnesium carbonate', a:{Mg:1,C:1,O:3}},
+  P4:{f:'KNO₃',     n:'Potassium nitrate',   a:{K:1,N:1,O:3}},
+ },
+ clues:{
+  A1:'Magnesium + Hydrochloric acid → Magnesium chloride + Hydrogen gas',
+  D1:'Magnesium chloride + Silver nitrate → Silver chloride + Magnesium nitrate',
+  A2:'Magnesium nitrate + Potassium carbonate → Magnesium carbonate + Potassium nitrate',
+ },
+ solution:{R1:1,R2:2,S1:1,P1:1,R3:2,P2:2,S2:1,R4:1,P3:1,P4:2},
+ locked:{R2:2,P2:2}},
+
+// ─────────────────── PUZZLE 14  Ca–HNO₃ ───────────────────────────────
+{title:'Calcium Nitrate Chain', difficulty:'Hard',
+ compounds:{
+  R1:{f:'Ca(OH)₂',  n:'Calcium hydroxide',  a:{Ca:1,O:2,H:2}},
+  R2:{f:'HNO₃',     n:'Nitric acid',        a:{H:1,N:1,O:3}},
+  S1:{f:'Ca(NO₃)₂', n:'Calcium nitrate',    a:{Ca:1,N:2,O:6}, shared:true},
+  P1:{f:'H₂O',      n:'Water',              a:{H:2,O:1}},
+  R3:{f:'Na₂CO₃',   n:'Sodium carbonate',   a:{Na:2,C:1,O:3}},
+  P2:{f:'CaCO₃',    n:'Calcium carbonate',  a:{Ca:1,C:1,O:3}},
+  S2:{f:'NaNO₃',    n:'Sodium nitrate',     a:{Na:1,N:1,O:3}, shared:true},
+  R4:{f:'BaCl₂',    n:'Barium chloride',    a:{Ba:1,Cl:2}},
+  P3:{f:'Ba(NO₃)₂', n:'Barium nitrate',     a:{Ba:1,N:2,O:6}},
+  P4:{f:'NaCl',     n:'Sodium chloride',    a:{Na:1,Cl:1}},
+ },
+ clues:{
+  A1:'Calcium hydroxide + Nitric acid → Calcium nitrate + Water',
+  D1:'Calcium nitrate + Sodium carbonate → Calcium carbonate + Sodium nitrate',
+  A2:'Sodium nitrate + Barium chloride → Barium nitrate + Sodium chloride',
+ },
+ solution:{R1:1,R2:2,S1:1,P1:2,R3:1,P2:1,S2:2,R4:1,P3:1,P4:2},
+ locked:{R3:1,P2:1}},
+
+// ─────────────────── PUZZLE 15  Mg–HNO₃ ───────────────────────────────
+{title:'Magnesium Nitrate Chain', difficulty:'Hard',
+ compounds:{
+  R1:{f:'Mg(OH)₂',  n:'Magnesium hydroxide', a:{Mg:1,O:2,H:2}},
+  R2:{f:'HNO₃',     n:'Nitric acid',          a:{H:1,N:1,O:3}},
+  S1:{f:'Mg(NO₃)₂', n:'Magnesium nitrate',    a:{Mg:1,N:2,O:6}, shared:true},
+  P1:{f:'H₂O',      n:'Water',                a:{H:2,O:1}},
+  R3:{f:'Na₂CO₃',   n:'Sodium carbonate',     a:{Na:2,C:1,O:3}},
+  P2:{f:'MgCO₃',    n:'Magnesium carbonate',  a:{Mg:1,C:1,O:3}},
+  S2:{f:'NaNO₃',    n:'Sodium nitrate',       a:{Na:1,N:1,O:3}, shared:true},
+  R4:{f:'BaCl₂',    n:'Barium chloride',      a:{Ba:1,Cl:2}},
+  P3:{f:'Ba(NO₃)₂', n:'Barium nitrate',       a:{Ba:1,N:2,O:6}},
+  P4:{f:'NaCl',     n:'Sodium chloride',      a:{Na:1,Cl:1}},
+ },
+ clues:{
+  A1:'Magnesium hydroxide + Nitric acid → Magnesium nitrate + Water',
+  D1:'Magnesium nitrate + Sodium carbonate → Magnesium carbonate + Sodium nitrate',
+  A2:'Sodium nitrate + Barium chloride → Barium nitrate + Sodium chloride',
+ },
+ solution:{R1:1,R2:2,S1:1,P1:2,R3:1,P2:1,S2:2,R4:1,P3:1,P4:2},
+ locked:{R3:1,P2:1}},
+
+]; // END PUZZLE_BANK
+
+// ═══════════════════════════════════════════════════════════════════════
+//  DATE LOGIC
+// ═══════════════════════════════════════════════════════════════════════
+
+const START_DATE = new Date('2026-04-01T00:00:00');
+
+function dayIndex(date) {
+  const d = new Date(date); d.setHours(0,0,0,0);
+  const s = new Date(START_DATE); s.setHours(0,0,0,0);
+  const diff = Math.floor((d - s) / 86400000);
+  return ((diff % PUZZLE_BANK.length) + PUZZLE_BANK.length) % PUZZLE_BANK.length;
+}
+
+function fmtDate(date) {
+  return date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+}
+
+function isSameDay(a, b) {
+  return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  GAME STATE
+// ═══════════════════════════════════════════════════════════════════════
+
+let puzzle    = null;
+let viewDate  = new Date();
+let state     = { values:{}, checked:false, solved:false };
+let activeClue = null;
+
+// Fixed grid slot order (all puzzles use same positions)
+// Slot IDs map to CELLS array entries that define layout
+// A1: R1(0,0) R2(0,1) →(0,2) S1(0,3) P1(0,4)
+// D1: S1=shared, R3(1,3) ↓(2,3) P2(3,3) S2=shared(4,3)
+// A2: S2=shared(4,3) R4(4,4) →(4,5) P3(4,6) P4(4,7)
+
+const GRID_DEF = [
+  {r:0,c:0,type:'active',slot:'R1',   num:'1',  rxns:['A1']},
+  {r:0,c:1,type:'active',slot:'R2',   num:'',   rxns:['A1']},
+  {r:0,c:2,type:'arrow', sym:'→'},
+  {r:0,c:3,type:'active',slot:'S1',   num:'D1', rxns:['A1','D1']},
+  {r:0,c:4,type:'active',slot:'P1',   num:'',   rxns:['A1']},
+  {r:0,c:5,type:'black'},
+  {r:0,c:6,type:'black'},
+  {r:0,c:7,type:'black'},
+  {r:1,c:0,type:'black'},
+  {r:1,c:1,type:'black'},
+  {r:1,c:2,type:'black'},
+  {r:1,c:3,type:'active',slot:'R3',   num:'',   rxns:['D1']},
+  {r:1,c:4,type:'black'},
+  {r:1,c:5,type:'black'},
+  {r:1,c:6,type:'black'},
+  {r:1,c:7,type:'black'},
+  {r:2,c:0,type:'black'},
+  {r:2,c:1,type:'black'},
+  {r:2,c:2,type:'black'},
+  {r:2,c:3,type:'arrow', sym:'↓'},
+  {r:2,c:4,type:'black'},
+  {r:2,c:5,type:'black'},
+  {r:2,c:6,type:'black'},
+  {r:2,c:7,type:'black'},
+  {r:3,c:0,type:'black'},
+  {r:3,c:1,type:'black'},
+  {r:3,c:2,type:'black'},
+  {r:3,c:3,type:'active',slot:'P2',   num:'',   rxns:['D1']},
+  {r:3,c:4,type:'black'},
+  {r:3,c:5,type:'black'},
+  {r:3,c:6,type:'black'},
+  {r:3,c:7,type:'black'},
+  {r:4,c:0,type:'black'},
+  {r:4,c:1,type:'black'},
+  {r:4,c:2,type:'black'},
+  {r:4,c:3,type:'active',slot:'S2',   num:'2',  rxns:['D1','A2']},
+  {r:4,c:4,type:'active',slot:'R4',   num:'',   rxns:['A2']},
+  {r:4,c:5,type:'arrow', sym:'→'},
+  {r:4,c:6,type:'active',slot:'P3',   num:'',   rxns:['A2']},
+  {r:4,c:7,type:'active',slot:'P4',   num:'',   rxns:['A2']},
+];
+
+const REACTION_DEFS = [
+  {id:'A1',label:'1 Across',dir:'across',reactants:['R1','R2'],products:['S1','P1']},
+  {id:'D1',label:'1 Down',  dir:'down',  reactants:['S1','R3'],products:['P2','S2']},
+  {id:'A2',label:'2 Across',dir:'across',reactants:['S2','R4'],products:['P3','P4']},
+];
+
+// ═══════════════════════════════════════════════════════════════════════
+//  CHEMISTRY
+// ═══════════════════════════════════════════════════════════════════════
+
+function scaleAtoms(slot, n) {
+  const r={};
+  for(const [el,c] of Object.entries(puzzle.compounds[slot].a)) r[el]=c*n;
+  return r;
+}
+function addAtoms(a,b) {
+  const r={...a};
+  for(const [el,n] of Object.entries(b)) r[el]=(r[el]||0)+n;
+  return r;
+}
+function atomsEqual(a,b) {
+  const ka=Object.keys(a),kb=Object.keys(b);
+  if(ka.length!==kb.length) return false;
+  return ka.every(k=>a[k]===(b[k]||0));
+}
+function isBalanced(rxn) {
+  let L={},R={};
+  for(const s of rxn.reactants){ const v=state.values[s]; if(!v||v<1) return false; L=addAtoms(L,scaleAtoms(s,v)); }
+  for(const s of rxn.products) { const v=state.values[s]; if(!v||v<1) return false; R=addAtoms(R,scaleAtoms(s,v)); }
+  return atomsEqual(L,R);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  LOAD PUZZLE
+// ═══════════════════════════════════════════════════════════════════════
+
+function loadPuzzle(date) {
+  viewDate = new Date(date);
+  puzzle   = PUZZLE_BANK[dayIndex(date)];
+  state    = { values:{}, checked:false, solved:false };
+  activeClue = null;
+
+  // Init values (locked = pre-filled, others = null)
+  Object.keys(puzzle.compounds).forEach(slot => {
+    state.values[slot] = (puzzle.locked[slot] !== undefined) ? puzzle.locked[slot] : null;
+  });
+
+  // Update top bar
+  const today = new Date();
+  document.getElementById('topDate').textContent = fmtDate(viewDate) + (isSameDay(viewDate,today) ? '  ·  Today' : '');
+  document.getElementById('topTitle').textContent = puzzle.title;
+  const db = document.getElementById('topDiff');
+  db.textContent = puzzle.difficulty;
+  db.className = 'diff-badge diff-'+puzzle.difficulty;
+
+  renderGrid();
+  renderClues();
+  renderReference();
+  renderBadges();
+  refreshArchive();
+  document.getElementById('grid').classList.remove('won');
+  hideStatus();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RENDER GRID
+// ═══════════════════════════════════════════════════════════════════════
+
+function renderGrid() {
+  const g = document.getElementById('grid');
+  g.innerHTML = '';
+  GRID_DEF.forEach(cell => {
+    const div = document.createElement('div');
+    div.className = 'cell';
+    if (cell.type==='black')  { div.classList.add('black'); }
+    else if (cell.type==='arrow') { div.classList.add('arrow'); div.textContent=cell.sym; }
+    else {
+      div.classList.add('active');
+      div.dataset.slot = cell.slot;
+      const cmp = puzzle.compounds[cell.slot];
+      if (cmp.shared) div.classList.add('shared');
+      if (cell.num) { const n=document.createElement('span'); n.className='cell-num'; n.textContent=cell.num; div.appendChild(n); }
+      const fl=document.createElement('div'); fl.className='cell-formula'; fl.textContent=cmp.f; div.appendChild(fl);
+      const inp=document.createElement('input'); inp.type='number'; inp.min='1'; inp.max='9';
+      inp.id='inp-'+cell.slot;
+      if (puzzle.locked[cell.slot]!==undefined) {
+        inp.value=puzzle.locked[cell.slot]; inp.readOnly=true; inp.classList.add('locked');
+      } else if (state.values[cell.slot]!==null) {
+        inp.value=state.values[cell.slot];
+      }
+      inp.addEventListener('input',e=>{
+        const v=parseInt(e.target.value);
+        state.values[cell.slot]=(v>=1&&v<=9)?v:null;
+        if(state.checked){refreshCellStyles();refreshBadges();}
+      });
+      inp.addEventListener('keydown',e=>{
+        if(e.key==='Enter') checkSolution();
+        if(['ArrowRight','ArrowLeft','ArrowDown','ArrowUp'].includes(e.key)){
+          e.preventDefault(); navInputs(cell,e.key);
+        }
+      });
+      div.appendChild(inp);
+    }
+    g.appendChild(div);
+  });
+}
+
+function navInputs(from,key){
+  const dr={ArrowDown:1,ArrowUp:-1,ArrowLeft:0,ArrowRight:0}[key];
+  const dc={ArrowRight:1,ArrowLeft:-1,ArrowDown:0,ArrowUp:0}[key];
+  let r=from.r+dr,c=from.c+dc;
+  while(r>=0&&r<5&&c>=0&&c<8){
+    const t=GRID_DEF.find(x=>x.r===r&&x.c===c&&x.type==='active'&&!puzzle.locked[x.slot]);
+    if(t){document.getElementById('inp-'+t.slot)?.focus();return;}
+    r+=dr;c+=dc;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RENDER CLUES
+// ═══════════════════════════════════════════════════════════════════════
+
+function renderClues(){
+  ['acrossClues','downClues'].forEach(id=>document.getElementById(id).innerHTML='');
+  REACTION_DEFS.forEach(rxn=>{
+    const div=document.createElement('div');
+    div.className='clue-item'; div.dataset.rid=rxn.id;
+    div.innerHTML=`<div class="clue-lbl">${rxn.label}</div><div class="clue-txt">${puzzle.clues[rxn.id]}</div>`;
+    div.addEventListener('click',()=>highlightRxn(rxn.id));
+    document.getElementById(rxn.dir==='across'?'acrossClues':'downClues').appendChild(div);
+  });
+}
+
+function renderReference(){
+  const tb=document.getElementById('refBody'); tb.innerHTML='';
+  Object.entries(puzzle.compounds).forEach(([slot,c])=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${c.n}</td><td><span class="pill">${c.f}</span></td><td>${c.shared?'<span class="shr-pill">shared</span>':''}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function renderBadges(){
+  const el=document.getElementById('rStatus'); el.innerHTML='';
+  REACTION_DEFS.forEach(rxn=>{
+    const b=document.createElement('div'); b.className='rbadge'; b.id='badge-'+rxn.id; b.textContent=rxn.label; el.appendChild(b);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  HIGHLIGHT
+// ═══════════════════════════════════════════════════════════════════════
+
+function highlightRxn(rid) {
+  document.querySelectorAll('.cell.active').forEach(d=>d.classList.remove('hi'));
+  document.querySelectorAll('.clue-item').forEach(d=>d.classList.remove('active'));
+  if(activeClue===rid){activeClue=null;return;}
+  activeClue=rid;
+  const rxn=REACTION_DEFS.find(r=>r.id===rid);
+  [...rxn.reactants,...rxn.products].forEach(s=>{
+    document.querySelector(`.cell[data-slot="${s}"]`)?.classList.add('hi');
+  });
+  document.querySelector(`.clue-item[data-rid="${rid}"]`)?.classList.add('active');
+  for(const s of [...rxn.reactants,...rxn.products]){
+    const inp=document.getElementById('inp-'+s);
+    if(inp&&!inp.readOnly&&!state.values[s]){inp.focus();break;}
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  STYLE REFRESH
+// ═══════════════════════════════════════════════════════════════════════
+
+function refreshCellStyles(){
+  document.querySelectorAll('.cell.active').forEach(div=>{
+    div.classList.remove('correct','wrong');
+    if(!state.checked) return;
+    const slot=div.dataset.slot;
+    if(!slot||state.values[slot]===null) return;
+    div.classList.add(state.values[slot]===puzzle.solution[slot]?'correct':'wrong');
+  });
+}
+function refreshBadges(){
+  REACTION_DEFS.forEach(rxn=>{
+    const b=document.getElementById('badge-'+rxn.id); if(!b) return;
+    b.classList.remove('balanced','unbalanced');
+    const filled=[...rxn.reactants,...rxn.products].every(s=>state.values[s]!==null);
+    if(filled){const ok=isBalanced(rxn);b.classList.add(ok?'balanced':'unbalanced');b.textContent=rxn.label+(ok?' ✓':' ✗');}
+    else b.textContent=rxn.label;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  GAME ACTIONS
+// ═══════════════════════════════════════════════════════════════════════
+
+function checkSolution(){
+  state.checked=true;
+  const slots=GRID_DEF.filter(c=>c.type==='active'&&!puzzle.locked[c.slot]).map(c=>c.slot);
+  if(!slots.every(s=>state.values[s]!==null)){
+    showStatus('Fill in every white cell before checking.','info');
+    refreshCellStyles(); refreshBadges(); return;
+  }
+  refreshCellStyles(); refreshBadges();
+  const bad=REACTION_DEFS.filter(r=>!isBalanced(r)).map(r=>r.label);
+  if(bad.length===0){
+    state.solved=true;
+    document.getElementById('grid').classList.add('won');
+    showStatus('🎉 All reactions balanced! Shared cells agree perfectly. Excellent work!','success');
+  } else {
+    showStatus(`Not balanced yet: ${bad.join(', ')}. Red cells show incorrect coefficients.`,'error');
+  }
+}
+
+function giveHint(){
+  const wrong=GRID_DEF.filter(c=>{
+    if(c.type!=='active'||puzzle.locked[c.slot]) return false;
+    return state.values[c.slot]!==puzzle.solution[c.slot];
+  });
+  if(!wrong.length){showStatus('Looks correct — press Check to confirm!','info');return;}
+  const s=wrong[0].slot; const cmp=puzzle.compounds[s];
+  showStatus(`Hint: Focus on the coefficient for ${cmp.n} (${cmp.f}).`,'info');
+  document.getElementById('inp-'+s)?.focus();
+}
+
+function clearAll(){
+  if(state.solved&&!confirm('Clear the solved puzzle?')) return;
+  GRID_DEF.filter(c=>c.type==='active'&&!puzzle.locked[c.slot]).forEach(c=>{
+    state.values[c.slot]=null;
+    const inp=document.getElementById('inp-'+c.slot);
+    if(inp){inp.value='';inp.style.color='';}
+  });
+  state.checked=false; state.solved=false;
+  document.getElementById('grid').classList.remove('won');
+  document.querySelectorAll('.cell.active').forEach(d=>d.classList.remove('correct','wrong'));
+  REACTION_DEFS.forEach(r=>{const b=document.getElementById('badge-'+r.id);if(b){b.classList.remove('balanced','unbalanced');b.textContent=r.label;}});
+  hideStatus();
+}
+
+function revealAll(){
+  if(!confirm('Reveal the full solution? This ends today\'s puzzle.')) return;
+  GRID_DEF.filter(c=>c.type==='active'&&!puzzle.locked[c.slot]).forEach(c=>{
+    state.values[c.slot]=puzzle.solution[c.slot];
+    const inp=document.getElementById('inp-'+c.slot);
+    if(inp){inp.value=puzzle.solution[c.slot];inp.style.color='#f0883e';}
+  });
+  state.checked=true; refreshCellStyles(); refreshBadges();
+  showStatus('Solution revealed. Notice how the orange shared cells serve two reactions simultaneously!','info');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  STATUS
+// ═══════════════════════════════════════════════════════════════════════
+
+function showStatus(msg,type){
+  const el=document.getElementById('statusBar');
+  el.textContent=msg; el.className='status-bar show '+type;
+}
+function hideStatus(){document.getElementById('statusBar').className='status-bar';}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ARCHIVE
+// ═══════════════════════════════════════════════════════════════════════
+
+function toggleArchive(){
+  const panel=document.getElementById('archPanel');
+  const btn=document.getElementById('btnArch');
+  const open=panel.classList.toggle('show');
+  btn.classList.toggle('active',open);
+  if(open) refreshArchive();
+}
+
+function refreshArchive(){
+  const grid=document.getElementById('archGrid'); grid.innerHTML='';
+  const today=new Date(); today.setHours(0,0,0,0);
+  // Show 30 days: 29 past + today
+  for(let i=29;i>=0;i--){
+    const d=new Date(today); d.setDate(today.getDate()-i);
+    const btn=document.createElement('div');
+    btn.className='arch-day'+(isSameDay(d,today)?' today':'')+(isSameDay(d,viewDate)?' selected':'');
+    const idx=dayIndex(d);
+    const puz=PUZZLE_BANK[idx];
+    btn.textContent=d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' — '+puz.title.split('–')[0].trim();
+    btn.title=fmtDate(d)+': '+puz.title+' ('+puz.difficulty+')';
+    btn.addEventListener('click',()=>{loadPuzzle(d);toggleArchive();});
+    grid.appendChild(btn);
+  }
+  // Show upcoming 7 days (greyed)
+  for(let i=1;i<=7;i++){
+    const d=new Date(today); d.setDate(today.getDate()+i);
+    const btn=document.createElement('div');
+    btn.className='arch-day future';
+    btn.textContent=d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' — Coming soon';
+    grid.appendChild(btn);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════════════════════════
+
+loadPuzzle(new Date());
+</script>
+</body>
+</html>
