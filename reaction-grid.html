@@ -97,6 +97,22 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#e6edf
 /* ── WIN ───────────────────────────────── */
 @keyframes pop{0%,100%{transform:scale(1)}50%{transform:scale(1.02)}}
 .grid.won{animation:pop .4s ease 3;border-color:#3fb950}
+
+/* ── DIFFICULTY SELECTOR ───────────────── */
+.diff-tabs{display:flex;gap:0;border-radius:7px;overflow:hidden;border:1px solid #30363d}
+.diff-tab{padding:5px 14px;font-size:.78rem;font-weight:700;cursor:pointer;border:none;background:#1c2128;color:#8b949e;transition:all .15s;letter-spacing:.3px}
+.diff-tab:not(:last-child){border-right:1px solid #30363d}
+.diff-tab:hover{color:#c9d1d9;background:#2d333b}
+.diff-tab.sel-beginner{background:#0a2218;color:#3fb950}
+.diff-tab.sel-intermediate{background:#1f1a00;color:#d29922}
+.diff-tab.sel-expert{background:#1e0a0a;color:#f85149}
+
+/* ── MODE BANNER ───────────────────────── */
+.mode-banner{padding:7px 18px;font-size:.78rem;font-weight:600;display:flex;align-items:center;gap:8px;border-bottom:1px solid}
+.mode-banner.mb-beginner{background:#0a2218;border-color:#3fb950;color:#3fb950}
+.mode-banner.mb-intermediate{background:#1f1a00;border-color:#d29922;color:#d29922}
+.mode-banner.mb-expert{background:#1e0a0a;border-color:#f85149;color:#f85149}
+.mode-banner span.mb-sub{font-weight:400;color:inherit;opacity:.8}
 </style>
 </head>
 <body>
@@ -108,10 +124,16 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#e6edf
     <span class="puzzle-title" id="topTitle"></span>
     <span class="diff-badge" id="topDiff"></span>
   </div>
-  <div style="display:flex;gap:8px;align-items:center">
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <div class="diff-tabs">
+      <button class="diff-tab" id="tab-beginner"     onclick="setDifficulty('beginner')">🟢 Beginner</button>
+      <button class="diff-tab" id="tab-intermediate" onclick="setDifficulty('intermediate')">🟡 Intermediate</button>
+      <button class="diff-tab" id="tab-expert"       onclick="setDifficulty('expert')">🔴 Expert</button>
+    </div>
     <button class="btn-arch" id="btnArch" onclick="toggleArchive()">📅 Archive</button>
   </div>
 </div>
+<div class="mode-banner" id="modeBanner"></div>
 
 <div class="archive-panel" id="archPanel">
   <h4>Puzzle Archive — click any date to load that day's puzzle</h4>
@@ -520,10 +542,55 @@ function isSameDay(a, b) {
 //  GAME STATE
 // ═══════════════════════════════════════════════════════════════════════
 
-let puzzle    = null;
-let viewDate  = new Date();
-let state     = { values:{}, checked:false, solved:false };
-let activeClue = null;
+let puzzle       = null;
+let viewDate     = new Date();
+let state        = { values:{}, checked:false, solved:false };
+let activeClue   = null;
+let difficulty   = 'intermediate'; // 'beginner' | 'intermediate' | 'expert'
+
+// ── Difficulty helpers ──────────────────────────────────────────────────────
+
+const DIFF_META = {
+  beginner:     { icon:'🟢', label:'Beginner',     cls:'mb-beginner',     tabCls:'sel-beginner',
+                  sub:'Several cells are pre-filled. Focus on translating formulas and understanding the chain.' },
+  intermediate: { icon:'🟡', label:'Intermediate', cls:'mb-intermediate', tabCls:'sel-intermediate',
+                  sub:'Two hint cells are given. Balance all three reactions using the shared constraints.' },
+  expert:       { icon:'🔴', label:'Expert',       cls:'mb-expert',       tabCls:'sel-expert',
+                  sub:'No hints given. Every coefficient is yours to find — including both shared cells.' },
+};
+
+function getLockedForDifficulty(puz, diff) {
+  if (diff === 'expert') return {};
+  if (diff === 'intermediate') return {...puz.locked};
+  // Beginner: start with intermediate hints, then also lock every
+  // non-shared cell whose solution value is 1 (lowest cognitive load to reveal).
+  const lk = {...puz.locked};
+  GRID_DEF.filter(c => c.type === 'active').forEach(c => {
+    if (!puz.compounds[c.slot].shared && puz.solution[c.slot] === 1) {
+      lk[c.slot] = 1;
+    }
+  });
+  return lk;
+}
+
+function setDifficulty(diff) {
+  difficulty = diff;
+  // Update tab button appearances
+  Object.keys(DIFF_META).forEach(d => {
+    const tab = document.getElementById('tab-'+d);
+    if (!tab) return;
+    tab.className = 'diff-tab' + (d === diff ? ' '+DIFF_META[d].tabCls : '');
+  });
+  // Reload the current puzzle with new difficulty
+  loadPuzzle(viewDate);
+}
+
+function updateModeBanner(diff) {
+  const m   = DIFF_META[diff];
+  const el  = document.getElementById('modeBanner');
+  el.className = 'mode-banner ' + m.cls;
+  el.innerHTML = `${m.icon} <strong>${m.label} Mode</strong> <span class="mb-sub">— ${m.sub}</span>`;
+}
 
 // Fixed grid slot order (all puzzles use same positions)
 // Slot IDs map to CELLS array entries that define layout
@@ -616,9 +683,12 @@ function loadPuzzle(date) {
   state    = { values:{}, checked:false, solved:false };
   activeClue = null;
 
+  // Compute which cells are locked for the chosen difficulty
+  const activeLocked = getLockedForDifficulty(puzzle, difficulty);
+
   // Init values (locked = pre-filled, others = null)
   Object.keys(puzzle.compounds).forEach(slot => {
-    state.values[slot] = (puzzle.locked[slot] !== undefined) ? puzzle.locked[slot] : null;
+    state.values[slot] = (activeLocked[slot] !== undefined) ? activeLocked[slot] : null;
   });
 
   // Update top bar
@@ -634,6 +704,7 @@ function loadPuzzle(date) {
   renderReference();
   renderBadges();
   refreshArchive();
+  updateModeBanner(difficulty);
   document.getElementById('grid').classList.remove('won');
   hideStatus();
 }
@@ -659,8 +730,9 @@ function renderGrid() {
       const fl=document.createElement('div'); fl.className='cell-formula'; fl.textContent=cmp.f; div.appendChild(fl);
       const inp=document.createElement('input'); inp.type='number'; inp.min='1'; inp.max='9';
       inp.id='inp-'+cell.slot;
-      if (puzzle.locked[cell.slot]!==undefined) {
-        inp.value=puzzle.locked[cell.slot]; inp.readOnly=true; inp.classList.add('locked');
+      const activeLk = getLockedForDifficulty(puzzle, difficulty);
+      if (activeLk[cell.slot]!==undefined) {
+        inp.value=activeLk[cell.slot]; inp.readOnly=true; inp.classList.add('locked');
       } else if (state.values[cell.slot]!==null) {
         inp.value=state.values[cell.slot];
       }
@@ -686,7 +758,8 @@ function navInputs(from,key){
   const dc={ArrowRight:1,ArrowLeft:-1,ArrowDown:0,ArrowUp:0}[key];
   let r=from.r+dr,c=from.c+dc;
   while(r>=0&&r<5&&c>=0&&c<8){
-    const t=GRID_DEF.find(x=>x.r===r&&x.c===c&&x.type==='active'&&!puzzle.locked[x.slot]);
+    const _nlk=getLockedForDifficulty(puzzle,difficulty);
+    const t=GRID_DEF.find(x=>x.r===r&&x.c===c&&x.type==='active'&&!_nlk[x.slot]);
     if(t){document.getElementById('inp-'+t.slot)?.focus();return;}
     r+=dr;c+=dc;
   }
@@ -772,7 +845,8 @@ function refreshBadges(){
 
 function checkSolution(){
   state.checked=true;
-  const slots=GRID_DEF.filter(c=>c.type==='active'&&!puzzle.locked[c.slot]).map(c=>c.slot);
+  const _clk=getLockedForDifficulty(puzzle,difficulty);
+  const slots=GRID_DEF.filter(c=>c.type==='active'&&!_clk[c.slot]).map(c=>c.slot);
   if(!slots.every(s=>state.values[s]!==null)){
     showStatus('Fill in every white cell before checking.','info');
     refreshCellStyles(); refreshBadges(); return;
@@ -790,7 +864,8 @@ function checkSolution(){
 
 function giveHint(){
   const wrong=GRID_DEF.filter(c=>{
-    if(c.type!=='active'||puzzle.locked[c.slot]) return false;
+    const _hlk=getLockedForDifficulty(puzzle,difficulty);
+    if(c.type!=='active'||_hlk[c.slot]) return false;
     return state.values[c.slot]!==puzzle.solution[c.slot];
   });
   if(!wrong.length){showStatus('Looks correct — press Check to confirm!','info');return;}
@@ -801,7 +876,8 @@ function giveHint(){
 
 function clearAll(){
   if(state.solved&&!confirm('Clear the solved puzzle?')) return;
-  GRID_DEF.filter(c=>c.type==='active'&&!puzzle.locked[c.slot]).forEach(c=>{
+  const lk=getLockedForDifficulty(puzzle,difficulty);
+  GRID_DEF.filter(c=>c.type==='active'&&!lk[c.slot]).forEach(c=>{
     state.values[c.slot]=null;
     const inp=document.getElementById('inp-'+c.slot);
     if(inp){inp.value='';inp.style.color='';}
@@ -815,7 +891,8 @@ function clearAll(){
 
 function revealAll(){
   if(!confirm('Reveal the full solution? This ends today\'s puzzle.')) return;
-  GRID_DEF.filter(c=>c.type==='active'&&!puzzle.locked[c.slot]).forEach(c=>{
+  const rlk=getLockedForDifficulty(puzzle,difficulty);
+  GRID_DEF.filter(c=>c.type==='active'&&!rlk[c.slot]).forEach(c=>{
     state.values[c.slot]=puzzle.solution[c.slot];
     const inp=document.getElementById('inp-'+c.slot);
     if(inp){inp.value=puzzle.solution[c.slot];inp.style.color='#f0883e';}
@@ -874,6 +951,10 @@ function refreshArchive(){
 // ═══════════════════════════════════════════════════════════════════════
 //  BOOT
 // ═══════════════════════════════════════════════════════════════════════
+
+// Highlight the default difficulty tab on startup
+document.getElementById('tab-'+difficulty).className =
+  'diff-tab ' + DIFF_META[difficulty].tabCls;
 
 loadPuzzle(new Date());
 </script>
