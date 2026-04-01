@@ -102,6 +102,35 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#e6edf
 .ref-table td{padding:6px 7px;border-bottom:1px solid #21262d;color:#c9d1d9}
 .ref-table tr:hover td{background:#1c2128}
 .pill{font-family:monospace;background:#21262d;padding:1px 6px;border-radius:3px;color:#e6edf3;font-size:.78rem}
+/* Subscript sizing in formula displays */
+.cell-formula sub,.pill sub{font-size:.82em;vertical-align:baseline;position:relative;bottom:-.15em;line-height:0}
+/* Periodic table modal */
+.pt-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;align-items:center;justify-content:center;padding:16px}
+.pt-modal.open{display:flex}
+.pt-box{background:#161b22;border:2px solid #30363d;border-radius:12px;padding:18px 20px;max-width:580px;width:100%;max-height:85vh;overflow-y:auto}
+.pt-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.pt-head h3{font-size:1rem;font-weight:700;color:#58a6ff}
+.pt-close{background:none;border:none;color:#8b949e;font-size:1.3rem;cursor:pointer;padding:2px 7px;border-radius:4px;line-height:1}
+.pt-close:hover{background:#21262d;color:#e6edf3}
+.pt-note{font-size:.72rem;color:#8b949e;margin-bottom:12px;line-height:1.5}
+.el-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:5px;margin-bottom:14px}
+.el-card{background:#21262d;border-radius:5px;padding:5px 3px 4px;text-align:center;border:1px solid #30363d;cursor:default;transition:background .12s}
+.el-card:hover{background:#2d333b}
+.el-num{font-size:.52rem;color:#8b949e;line-height:1.2}
+.el-sym{font-size:1.15rem;font-weight:700;color:#e6edf3;line-height:1.2}
+.el-chg{font-size:.62rem;font-weight:700;line-height:1.3;margin-top:1px;letter-spacing:.2px}
+.el-chg.chg-pos{color:#d29922}
+.el-chg.chg-neg{color:#79c0ff}
+.el-chg.chg-mix{color:#f0883e}
+.el-chg.chg-zero{color:#6e7681}
+.el-name{font-size:.5rem;color:#8b949e;line-height:1.3;margin-top:1px;word-break:break-word}
+.pt-legend{display:flex;gap:10px;flex-wrap:wrap;font-size:.65rem;margin-bottom:10px;padding:7px 10px;background:#21262d;border-radius:5px}
+.pt-legend span{display:flex;align-items:center;gap:4px}
+.pt-legend i{display:inline-block;width:10px;height:10px;border-radius:2px}
+.btn-pt-full{display:block;text-align:center;padding:9px 12px;background:#111d2e;color:#58a6ff;border:1px solid #58a6ff;border-radius:6px;text-decoration:none;font-size:.82rem;font-weight:600;transition:background .15s}
+.btn-pt-full:hover{background:#1a2d45}
+.btn-pt{background:#1c2128;color:#79c0ff;border:1px solid #58a6ff}
+.btn-pt:hover{background:#111d2e}
 .shr-pill{background:#1e1a12;color:#f0883e;font-size:.65rem;padding:1px 5px;border-radius:3px;border:1px solid #f0883e;font-weight:600}
 
 /* ── WIN ───────────────────────────────── */
@@ -191,6 +220,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#e6edf
     <div class="grid" id="grid"></div>
     <div class="rxn-status" id="rStatus"></div>
     <div class="controls">
+      <button class="btn btn-pt" onclick="openPT()">🔬 Periodic Table</button>
       <button class="btn btn-check" onclick="checkSolution()">✓ Check</button>
       <button class="btn btn-hint"  onclick="giveHint()">💡 Hint</button>
       <button class="btn btn-clear" onclick="clearAll()">↺ Clear</button>
@@ -776,7 +806,7 @@ function renderGrid() {
       const cmp = puzzle.compounds[cell.slot];
       if (cmp.shared) div.classList.add('shared');
       if (cell.num) { const n=document.createElement('span'); n.className='cell-num'; n.textContent=cell.num; div.appendChild(n); }
-      const fl=document.createElement('div'); fl.className='cell-formula'; fl.textContent=cmp.f; div.appendChild(fl);
+      const fl=document.createElement('div'); fl.className='cell-formula'; fl.innerHTML=fmtFormula(cmp.f); div.appendChild(fl);
       // Formula text input (Expert only — shown via .expert-mode CSS class)
       const finp=document.createElement('input'); finp.type='text'; finp.className='formula-inp';
       finp.id='finp-'+cell.slot; finp.placeholder=cmp.n.split(' ')[0].substring(0,4);
@@ -853,7 +883,7 @@ function renderReference(){
   if(fth) fth.style.display=isExp?'none':'';
   Object.entries(puzzle.compounds).forEach(([slot,c])=>{
     const tr=document.createElement('tr');
-    const formulaCell=isExp?'<td style="display:none"></td>':`<td><span class="pill">${c.f}</span></td>`;
+    const formulaCell=isExp?'<td style="display:none"></td>':`<td><span class="pill">${fmtFormula(c.f)}</span></td>`;
     tr.innerHTML=`<td>${c.n}</td>${formulaCell}<td>${c.shared?'<span class="shr-pill">shared</span>':''}</td>`;
     tb.appendChild(tr);
   });
@@ -926,6 +956,12 @@ function refreshBadges(){
 
 // Normalize formula for comparison (trim, remove spaces, case-insensitive)
 function normF(s){ return (s||'').trim().replace(/\s+/g,'').toLowerCase(); }
+
+// Convert Unicode subscript digits to HTML <sub> tags for display
+function fmtFormula(f){
+  const sub={'₀':'0','₁':'1','₂':'2','₃':'3','₄':'4','₅':'5','₆':'6','₇':'7','₈':'8','₉':'9'};
+  return (f||'').replace(/[₀-₉]/g,c=>`<sub>${sub[c]||c}</sub>`);
+}
 
 function checkSolution(){
   state.checked=true;
@@ -1072,6 +1108,86 @@ document.getElementById('tab-'+difficulty).className =
   'diff-tab ' + DIFF_META[difficulty].tabCls;
 
 loadPuzzle(new Date());
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PERIODIC TABLE POPUP
+// ═══════════════════════════════════════════════════════════════════════
+
+// v = common valence charge(s); cls = color category
+const ELEMENTS = [
+  {n:1,  s:'H',  name:'Hydrogen',   v:'+1 / −1', cls:'chg-mix'},
+  {n:2,  s:'He', name:'Helium',     v:'0',            cls:'chg-zero'},
+  {n:3,  s:'Li', name:'Lithium',    v:'+1',           cls:'chg-pos'},
+  {n:4,  s:'Be', name:'Beryllium',  v:'+2',           cls:'chg-pos'},
+  {n:5,  s:'B',  name:'Boron',      v:'+3',           cls:'chg-pos'},
+  {n:6,  s:'C',  name:'Carbon',     v:'+4 / −4', cls:'chg-mix'},
+  {n:7,  s:'N',  name:'Nitrogen',   v:'−3, +5',  cls:'chg-mix'},
+  {n:8,  s:'O',  name:'Oxygen',     v:'−2',      cls:'chg-neg'},
+  {n:9,  s:'F',  name:'Fluorine',   v:'−1',      cls:'chg-neg'},
+  {n:10, s:'Ne', name:'Neon',       v:'0',            cls:'chg-zero'},
+  {n:11, s:'Na', name:'Sodium',     v:'+1',           cls:'chg-pos'},
+  {n:12, s:'Mg', name:'Magnesium',  v:'+2',           cls:'chg-pos'},
+  {n:13, s:'Al', name:'Aluminum',   v:'+3',           cls:'chg-pos'},
+  {n:14, s:'Si', name:'Silicon',    v:'+4',           cls:'chg-pos'},
+  {n:15, s:'P',  name:'Phosphorus', v:'−3, +5',  cls:'chg-mix'},
+  {n:16, s:'S',  name:'Sulfur',     v:'−2, +6',  cls:'chg-mix'},
+  {n:17, s:'Cl', name:'Chlorine',   v:'−1',      cls:'chg-neg'},
+  {n:18, s:'Ar', name:'Argon',      v:'0',            cls:'chg-zero'},
+  {n:19, s:'K',  name:'Potassium',  v:'+1',           cls:'chg-pos'},
+  {n:20, s:'Ca', name:'Calcium',    v:'+2',           cls:'chg-pos'},
+  {n:25, s:'Mn', name:'Manganese',  v:'+2, +7',       cls:'chg-mix'},
+  {n:26, s:'Fe', name:'Iron',       v:'+2, +3',       cls:'chg-mix'},
+  {n:29, s:'Cu', name:'Copper',     v:'+1, +2',       cls:'chg-mix'},
+  {n:30, s:'Zn', name:'Zinc',       v:'+2',           cls:'chg-pos'},
+  {n:35, s:'Br', name:'Bromine',    v:'−1',      cls:'chg-neg'},
+  {n:47, s:'Ag', name:'Silver',     v:'+1',           cls:'chg-pos'},
+  {n:53, s:'I',  name:'Iodine',     v:'−1',      cls:'chg-neg'},
+  {n:56, s:'Ba', name:'Barium',     v:'+2',           cls:'chg-pos'},
+  {n:79, s:'Au', name:'Gold',       v:'+1, +3',       cls:'chg-mix'},
+  {n:82, s:'Pb', name:'Lead',       v:'+2, +4',       cls:'chg-mix'},
+];
+
+function openPT() {
+  const g = document.getElementById('elGrid');
+  if (!g.children.length) {
+    ELEMENTS.forEach(el => {
+      const card = document.createElement('div');
+      card.className = 'el-card';
+      card.innerHTML =
+        '<div class="el-num">'+el.n+'</div>'+
+        '<div class="el-sym">'+el.s+'</div>'+
+        '<div class="el-chg '+el.cls+'">'+el.v+'</div>'+
+        '<div class="el-name">'+el.name+'</div>';
+      g.appendChild(card);
+    });
+  }
+  document.getElementById('ptModal').classList.add('open');
+}
+function closePT(e) {
+  if (e.target === document.getElementById('ptModal'))
+    document.getElementById('ptModal').classList.remove('open');
+}
+
 </script>
+
+<!-- Periodic Table Modal -->
+<div id="ptModal" class="pt-modal" onclick="closePT(event)">
+  <div class="pt-box">
+    <div class="pt-head">
+      <h3>⚗️ Element Reference</h3>
+      <button class="pt-close" onclick="document.getElementById('ptModal').classList.remove('open')">✕</button>
+    </div>
+    <p class="pt-note">Common elements used in chemistry. The charge shown is the most common oxidation state(s).</p>
+    <div class="pt-legend">
+      <span><i style="background:#d29922"></i> Positive</span>
+      <span><i style="background:#79c0ff"></i> Negative</span>
+      <span><i style="background:#f0883e"></i> Variable</span>
+      <span><i style="background:#6e7681"></i> Noble / None</span>
+    </div>
+    <div class="el-grid" id="elGrid"></div>
+    <a href="https://www.ptable.com/" target="_blank" rel="noopener" class="btn-pt-full">🔗 Open Full Interactive Periodic Table (ptable.com)</a>
+  </div>
+</div>
+
 </body>
 </html>
