@@ -6,6 +6,7 @@
 <title>Reaction Grid – Chemistry Puzzle</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
+:root{--cell:78px}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#e6edf3;min-height:100vh}
 
 /* ── TOP BAR ───────────────────────────── */
@@ -38,8 +39,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#e6edf
 
 /* ── GRID ──────────────────────────────── */
 .grid-panel{flex:0 0 auto}
-.grid{display:grid;grid-template-columns:repeat(8,78px);grid-template-rows:repeat(5,78px);gap:3px;background:#30363d;border:3px solid #30363d;border-radius:8px;overflow:hidden}
-.cell{position:relative;width:78px;height:78px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.grid{display:grid;grid-template-columns:repeat(8,var(--cell));grid-template-rows:repeat(5,var(--cell));gap:3px;background:#30363d;border:3px solid #30363d;border-radius:8px;overflow:hidden}
+.cell{position:relative;width:var(--cell);height:var(--cell);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
 .cell.black{background:#0d1117}
 .cell.arrow{background:#161b22;font-size:1.6rem;color:#58a6ff;font-weight:bold}
 .cell.active{background:#1c2128}
@@ -51,9 +52,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#e6edf
 .cell.hi{outline:3px solid #58a6ff;outline-offset:-3px}
 .cell.shared.hi{outline:3px solid #f0883e;outline-offset:-3px}
 .cell-num{position:absolute;top:3px;left:4px;font-size:.55rem;font-weight:700;color:#58a6ff;line-height:1}
-.cell-formula{font-size:.58rem;color:#8b949e;text-align:center;line-height:1.2;padding:0 2px;max-width:74px;word-break:break-word}
+.cell-formula{font-size:.58rem;color:#8b949e;text-align:center;line-height:1.2;padding:0 2px;max-width:calc(var(--cell) - 4px);word-break:break-word}
 .cell.shared .cell-formula{color:#f0883e}
-.cell input{width:40px;height:36px;background:#0d1117;border:1px solid #444c56;color:#e6edf3;font-size:1.2rem;font-weight:700;text-align:center;border-radius:4px;outline:none;-moz-appearance:textfield}
+.cell input{width:calc(var(--cell)*.53);height:calc(var(--cell)*.47);background:#0d1117;border:1px solid #444c56;color:#e6edf3;font-size:clamp(.8rem,1.6vw,1.2rem);font-weight:700;text-align:center;border-radius:4px;outline:none;-moz-appearance:textfield}
 .cell input::-webkit-outer-spin-button,.cell input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .cell input:focus{border-color:#58a6ff;box-shadow:0 0 0 2px rgba(88,166,255,.2)}
 .cell input.locked{color:#8b949e;cursor:default;border-style:dashed}
@@ -113,6 +114,41 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#e6edf
 .mode-banner.mb-intermediate{background:#1f1a00;border-color:#d29922;color:#d29922}
 .mode-banner.mb-expert{background:#1e0a0a;border-color:#f85149;color:#f85149}
 .mode-banner span.mb-sub{font-weight:400;color:inherit;opacity:.8}
+
+/* ── MOBILE RESPONSIVE ──────────────────── */
+@media(max-width:640px){
+  :root{--cell:41px}
+  .top-bar{padding:7px 10px;gap:6px}
+  .top-logo{font-size:.88rem;letter-spacing:1px}
+  .puzzle-title{font-size:.75rem}
+  .top-date{font-size:.68rem}
+  .top-meta{gap:7px}
+  .btn-arch{padding:4px 9px;font-size:.7rem}
+  .diff-tabs{border-radius:5px}
+  .diff-tab{padding:4px 8px;font-size:.68rem;letter-spacing:0}
+  .mode-banner{padding:5px 10px;font-size:.7rem}
+  .game-wrap{padding:10px;gap:12px}
+  .cell.arrow{font-size:.9rem}
+  .cell-num{font-size:.42rem;top:2px;left:2px}
+  .cell-formula{font-size:.42rem;line-height:1.1}
+  .cell input{border-radius:3px;border-width:1px}
+  .clues-panel{min-width:0;max-width:100%;width:100%}
+  .howto{font-size:.72rem;padding:9px 11px}
+  .howto h4{font-size:.78rem}
+  .clues-sec h3{font-size:.65rem}
+  .clue-item{padding:8px 10px}
+  .clue-lbl{font-size:.65rem}
+  .clue-txt{font-size:.76rem}
+  .ref-table{font-size:.7rem}
+  .ref-table th{font-size:.62rem}
+  .controls{gap:6px;margin-top:10px}
+  .btn{padding:7px 11px;font-size:.78rem}
+  .status-bar{font-size:.76rem}
+  .rxn-status{gap:5px;margin-top:9px}
+  .rbadge{padding:3px 8px;font-size:.67rem}
+  .archive-panel{padding:10px 12px}
+  .arch-day{padding:4px 9px;font-size:.7rem}
+}
 </style>
 </head>
 <body>
