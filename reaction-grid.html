@@ -58,6 +58,15 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#e6edf
 .cell input::-webkit-outer-spin-button,.cell input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .cell input:focus{border-color:#58a6ff;box-shadow:0 0 0 2px rgba(88,166,255,.2)}
 .cell input.locked{color:#8b949e;cursor:default;border-style:dashed}
+/* Expert mode formula inputs */
+.formula-inp{display:none;width:calc(var(--cell)*.88);height:calc(var(--cell)*.27);background:#161b22;border:1px dashed #58a6ff;color:#e6edf3;font-size:clamp(.46rem,1.05vw,.64rem);font-weight:600;font-family:monospace;text-align:center;border-radius:3px;outline:none;padding:0 1px;-webkit-appearance:none}
+.formula-inp::placeholder{color:#444c56;font-size:.9em}
+.formula-inp:focus{border-color:#58a6ff;border-style:solid;box-shadow:0 0 0 2px rgba(88,166,255,.18)}
+.formula-inp.formula-correct{border-color:#3fb950;border-style:solid;color:#3fb950}
+.formula-inp.formula-wrong{border-color:#f85149;border-style:solid;color:#f85149}
+.expert-mode .formula-inp{display:block}
+.expert-mode .cell-formula{display:none}
+.ref-formula-col{transition:opacity .2s}
 
 /* ── BADGES + CONTROLS ─────────────────── */
 .rxn-status{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}
@@ -132,6 +141,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#e6edf
   .cell-num{font-size:.42rem;top:2px;left:2px}
   .cell-formula{font-size:.42rem;line-height:1.1}
   .cell input{border-radius:3px;border-width:1px}
+  .formula-inp{font-size:.42rem;height:calc(var(--cell)*.3)}
   .clues-panel{min-width:0;max-width:100%;width:100%}
   .howto{font-size:.72rem;padding:9px 11px}
   .howto h4{font-size:.78rem}
@@ -198,13 +208,14 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#e6edf
         <li>Enter coefficients (1–9) so both sides of each reaction balance — equal atoms on each side.</li>
         <li><span style="color:#f0883e;font-weight:600">Orange cells are shared</span> between two reactions. One number serves both.</li>
         <li>Press <strong>Check</strong> when every reaction is balanced.</li>
+        <li><strong>Expert only:</strong> formula labels are hidden — type each compound's formula in the dashed cell above its coefficient.</li>
       </ol>
     </div>
     <div class="clues-sec"><h3>Across</h3><div id="acrossClues"></div></div>
     <div class="clues-sec"><h3>Down</h3><div id="downClues"></div></div>
     <div class="clues-sec">
       <h3>Compound Reference</h3>
-      <table class="ref-table"><thead><tr><th>Name</th><th>Formula</th><th></th></tr></thead>
+      <table class="ref-table"><thead><tr><th>Name</th><th class="ref-formula-col">Formula</th><th></th></tr></thead>
       <tbody id="refBody"></tbody></table>
     </div>
   </div>
@@ -592,7 +603,7 @@ const DIFF_META = {
   intermediate: { icon:'🟡', label:'Intermediate', cls:'mb-intermediate', tabCls:'sel-intermediate',
                   sub:'Two hint cells are given. Balance all three reactions using the shared constraints.' },
   expert:       { icon:'🔴', label:'Expert',       cls:'mb-expert',       tabCls:'sel-expert',
-                  sub:'No hints given. Every coefficient is yours to find — including both shared cells.' },
+                  sub:'No hints — and the formula labels are hidden. Use the clues to identify each compound, type its formula, and find every coefficient.' },
 };
 
 function getLockedForDifficulty(puz, diff) {
@@ -716,7 +727,7 @@ function isBalanced(rxn) {
 function loadPuzzle(date) {
   viewDate = new Date(date);
   puzzle   = PUZZLE_BANK[dayIndex(date)];
-  state    = { values:{}, checked:false, solved:false };
+  state    = { values:{}, formulas:{}, checked:false, solved:false };
   activeClue = null;
 
   // Compute which cells are locked for the chosen difficulty
@@ -725,6 +736,7 @@ function loadPuzzle(date) {
   // Init values (locked = pre-filled, others = null)
   Object.keys(puzzle.compounds).forEach(slot => {
     state.values[slot] = (activeLocked[slot] !== undefined) ? activeLocked[slot] : null;
+    state.formulas[slot] = '';
   });
 
   // Update top bar
@@ -736,6 +748,7 @@ function loadPuzzle(date) {
   db.className = 'diff-badge diff-'+puzzle.difficulty;
 
   renderGrid();
+  document.getElementById('grid').classList.toggle('expert-mode', difficulty==='expert');
   renderClues();
   renderReference();
   renderBadges();
@@ -764,6 +777,22 @@ function renderGrid() {
       if (cmp.shared) div.classList.add('shared');
       if (cell.num) { const n=document.createElement('span'); n.className='cell-num'; n.textContent=cell.num; div.appendChild(n); }
       const fl=document.createElement('div'); fl.className='cell-formula'; fl.textContent=cmp.f; div.appendChild(fl);
+      // Formula text input (Expert only — shown via .expert-mode CSS class)
+      const finp=document.createElement('input'); finp.type='text'; finp.className='formula-inp';
+      finp.id='finp-'+cell.slot; finp.placeholder=cmp.n.split(' ')[0].substring(0,4);
+      finp.maxLength=10; finp.autocomplete='off'; finp.spellcheck=false;
+      if(state.formulas[cell.slot]) finp.value=state.formulas[cell.slot];
+      finp.addEventListener('input',e=>{
+        state.formulas[cell.slot]=e.target.value.trim();
+        if(state.checked){refreshCellStyles();refreshBadges();}
+      });
+      finp.addEventListener('keydown',e=>{
+        if(e.key==='Enter') checkSolution();
+        if(['ArrowRight','ArrowLeft','ArrowDown','ArrowUp'].includes(e.key)){
+          e.preventDefault(); navInputs(cell,e.key);
+        }
+      });
+      div.appendChild(finp);
       const inp=document.createElement('input'); inp.type='number'; inp.min='1'; inp.max='9';
       inp.id='inp-'+cell.slot;
       const activeLk = getLockedForDifficulty(puzzle, difficulty);
@@ -818,9 +847,14 @@ function renderClues(){
 
 function renderReference(){
   const tb=document.getElementById('refBody'); tb.innerHTML='';
+  const isExp=(difficulty==='expert');
+  // Toggle formula column header visibility
+  const fth=document.querySelector('.ref-formula-col');
+  if(fth) fth.style.display=isExp?'none':'';
   Object.entries(puzzle.compounds).forEach(([slot,c])=>{
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${c.n}</td><td><span class="pill">${c.f}</span></td><td>${c.shared?'<span class="shr-pill">shared</span>':''}</td>`;
+    const formulaCell=isExp?'<td style="display:none"></td>':`<td><span class="pill">${c.f}</span></td>`;
+    tr.innerHTML=`<td>${c.n}</td>${formulaCell}<td>${c.shared?'<span class="shr-pill">shared</span>':''}</td>`;
     tb.appendChild(tr);
   });
 }
@@ -859,10 +893,21 @@ function highlightRxn(rid) {
 function refreshCellStyles(){
   document.querySelectorAll('.cell.active').forEach(div=>{
     div.classList.remove('correct','wrong');
-    if(!state.checked) return;
     const slot=div.dataset.slot;
-    if(!slot||state.values[slot]===null) return;
-    div.classList.add(state.values[slot]===puzzle.solution[slot]?'correct':'wrong');
+    if(!slot) return;
+    // Formula input coloring on Expert
+    const finp=document.getElementById('finp-'+slot);
+    if(finp){
+      finp.classList.remove('formula-correct','formula-wrong');
+      if(state.checked && difficulty==='expert' && state.formulas[slot]){
+        finp.classList.add(normF(state.formulas[slot])===normF(puzzle.compounds[slot].f)?'formula-correct':'formula-wrong');
+      }
+    }
+    if(!state.checked) return;
+    if(state.values[slot]===null) return;
+    // On Expert a cell is only 'correct' if the formula is also right
+    const formulaOk = (difficulty!=='expert') || (normF(state.formulas[slot])===normF(puzzle.compounds[slot].f));
+    div.classList.add((state.values[slot]===puzzle.solution[slot]&&formulaOk)?'correct':'wrong');
   });
 }
 function refreshBadges(){
@@ -879,6 +924,9 @@ function refreshBadges(){
 //  GAME ACTIONS
 // ═══════════════════════════════════════════════════════════════════════
 
+// Normalize formula for comparison (trim, remove spaces, case-insensitive)
+function normF(s){ return (s||'').trim().replace(/\s+/g,'').toLowerCase(); }
+
 function checkSolution(){
   state.checked=true;
   const _clk=getLockedForDifficulty(puzzle,difficulty);
@@ -887,26 +935,57 @@ function checkSolution(){
     showStatus('Fill in every white cell before checking.','info');
     refreshCellStyles(); refreshBadges(); return;
   }
+  // Expert: also require all formula inputs to be filled
+  if(difficulty==='expert'){
+    const missingF=slots.filter(s=>!state.formulas[s]);
+    if(missingF.length>0){
+      showStatus('Expert mode: enter a chemical formula in every dashed cell first.','info');
+      refreshCellStyles(); refreshBadges(); return;
+    }
+    const wrongF=slots.filter(s=>normF(state.formulas[s])!==normF(puzzle.compounds[s].f));
+    if(wrongF.length>0){
+      refreshCellStyles(); refreshBadges();
+      const names=wrongF.map(s=>puzzle.compounds[s].n).join(', ');
+      showStatus(`Incorrect formula${wrongF.length>1?'s':''}: ${names}. Check the dashed cells.`,'error');
+      return;
+    }
+  }
   refreshCellStyles(); refreshBadges();
   const bad=REACTION_DEFS.filter(r=>!isBalanced(r)).map(r=>r.label);
   if(bad.length===0){
     state.solved=true;
     document.getElementById('grid').classList.add('won');
-    showStatus('🎉 All reactions balanced! Shared cells agree perfectly. Excellent work!','success');
+    const msg=difficulty==='expert'
+      ? '🎉 Perfect! Every formula and coefficient is correct. Expert chemistry mastered!'
+      : '🎉 All reactions balanced! Shared cells agree perfectly. Excellent work!';
+    showStatus(msg,'success');
   } else {
     showStatus(`Not balanced yet: ${bad.join(', ')}. Red cells show incorrect coefficients.`,'error');
   }
 }
 
 function giveHint(){
+  const _hlk=getLockedForDifficulty(puzzle,difficulty);
+  // On Expert, first hint at wrong formulas
+  if(difficulty==='expert'){
+    const wrongF=GRID_DEF.filter(c=>{
+      if(c.type!=='active'||_hlk[c.slot]) return false;
+      return normF(state.formulas[c.slot])!==normF(puzzle.compounds[c.slot].f);
+    });
+    if(wrongF.length){
+      const s=wrongF[0].slot; const cmp=puzzle.compounds[s];
+      showStatus(`Hint: The formula for "${cmp.n}" is not right yet. How many atoms does it contain?`,'info');
+      document.getElementById('finp-'+s)?.focus(); return;
+    }
+  }
   const wrong=GRID_DEF.filter(c=>{
-    const _hlk=getLockedForDifficulty(puzzle,difficulty);
     if(c.type!=='active'||_hlk[c.slot]) return false;
     return state.values[c.slot]!==puzzle.solution[c.slot];
   });
   if(!wrong.length){showStatus('Looks correct — press Check to confirm!','info');return;}
   const s=wrong[0].slot; const cmp=puzzle.compounds[s];
-  showStatus(`Hint: Focus on the coefficient for ${cmp.n} (${cmp.f}).`,'info');
+  const fHint=difficulty==='expert'?'':` (${cmp.f})`;
+  showStatus(`Hint: Focus on the coefficient for ${cmp.n}${fHint}.`,'info');
   document.getElementById('inp-'+s)?.focus();
 }
 
